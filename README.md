@@ -3,6 +3,7 @@
 pyo3-prost exposes Rust protobuf structs to Python.
 
 ```
+# A simple decoding benchmark
 Python:  14.008996680990094
 Rust  :  0.5708326659951126
 ```
