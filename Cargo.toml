@@ -2,8 +2,10 @@
 name = "pyo3-prost"
 version = "0.1.0"
 edition = "2018"
-authors = ["elbaro"]
-
+authors = ["elbaro <elbaro@users.noreply.github.com>"]
+license = "MIT"
+repository = "https://github.com/elbaro/pyo3-prost"
+description = "Use Rust protobuf structs in Python."
 
 [dependencies]
 proc-macro2 = "*"
