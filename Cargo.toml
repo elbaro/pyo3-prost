@@ -8,7 +8,7 @@ repository = "https://github.com/elbaro/pyo3-prost"
 description = "Use Rust protobuf structs in Python."
 
 [dependencies]
-proc-macro2 = "*"
+proc-macro2 = "1.0.27"
 quote = "1.0.9"
 syn = {version="1.0.73", features=["full"]}
 
