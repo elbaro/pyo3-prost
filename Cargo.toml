@@ -1,0 +1,14 @@
+[package]
+name = "pyo3-prost"
+version = "0.1.0"
+edition = "2018"
+authors = ["elbaro"]
+
+
+[dependencies]
+proc-macro2 = "*"
+quote = "1.0.9"
+syn = {version="1.0.73", features=["full"]}
+
+[lib]
+proc-macro = true
