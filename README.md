@@ -17,8 +17,8 @@ to your prost or tonic build.
 
 The intended usecase is when your Python project is locked down to Protobuf and you want to migrate some part to native modules in Rust.
 Python protobuf objects cannot be easily handled in the Rust side.
-For conversion, the Python protobuf object should be serialized and deserialized to Rust protobuf object.
-With `pyo3-prost` you can decode the bytes to Rust struct in Python from the beginning and pass it to the native module.
+For conversion, the Python protobuf object should be serialized and deserialized to a Rust protobuf object.
+With `pyo3-prost` you can decode the bytes to Rust structs in Python from the beginning and pass it to the native module.
 
 ## How it works
 
@@ -41,5 +41,7 @@ The derive macro `pyclass_for_prost_struct` will add
 ## Limitations (for now)
 Accessing numeric fields is fast. However each access to a repeated, map, or message field may return a cloned Python object.
 For example `obj.list_field.clear()` will only clear the returned copy, leaving the actual value untouched.
+
+Getters/setters are not provided for `oneof` fields.
 
 Later I will add a custom getter/setter for these cases.
