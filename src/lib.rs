@@ -56,7 +56,8 @@ fn pyclass_for_prost_struct_impl(input: proc_macro2::TokenStream) -> proc_macro2
                 }
 
                 #[staticmethod]
-                pub fn decode(bytes: &::pyo3::types::PyBytes) -> ::pyo3::PyResult<Self> {
+                #[pyo3(name = "decode")]  // avoid the name conflict with prost::Message
+                pub fn decode_py(bytes: &::pyo3::types::PyBytes) -> ::pyo3::PyResult<Self> {
                     let bytes: &[u8] = ::pyo3::FromPyObject::extract(bytes)?;
                     <Self as ::prost::Message>::decode(bytes).map_err(|e| {
                         ::pyo3::exceptions::PyRuntimeError::new_err(format!("{}", e))
