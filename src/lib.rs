@@ -75,15 +75,14 @@ fn pyclass_for_prost_struct_impl(input: proc_macro2::TokenStream) -> proc_macro2
                     Ok(())
                 }
 
-                /// why slow?
-                /// because it allocates the Rust buffer
-                /// and then copy to Python buffer.
-                pub fn encode_slow(&self, py: ::pyo3::Python) -> ::pyo3::PyResult<::pyo3::PyObject> {
-                    let mut buf = Vec::<u8>::new();
-                    ::prost::Message::encode(self, &mut buf).map_err(|e| {
-                        ::pyo3::exceptions::PyRuntimeError::new_err(format!("{}", e))
-                    })?;
-                    Ok(pyo3::types::PyBytes::new(py, &buf).into())
+                #[pyo3(name = "encode")]
+                pub fn encode_py<'a>(&self, py: ::pyo3::Python<'a>) -> ::pyo3::PyResult<&'a ::pyo3::types::PyBytes> {
+                    Ok(::pyo3::types::PyBytes::new_with(py, ::prost::Message::encoded_len(self), |mut py_buf: &mut [u8]| {
+                        ::prost::Message::encode(self, &mut py_buf).map_err(|e| {
+                            ::pyo3::exceptions::PyRuntimeError::new_err(format!("{}", e))
+                        })?;
+                        Ok(())
+                    })?)
                 }
 
                 pub fn clear(&mut self) {
