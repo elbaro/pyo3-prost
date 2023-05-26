@@ -48,7 +48,7 @@ pub fn derive_object_owned(ident: &Ident, fields: &[Field]) -> proc_macro2::Toke
             #[pyo3(name = "decode")]  // avoid the name conflict with prost::Message
             pub fn decode_py(bytes: &::pyo3::types::PyBytes) -> ::pyo3::PyResult<Self> {
                 let bytes: &[u8] = ::pyo3::FromPyObject::extract(bytes)?;
-                <#ident as ::prost::Message>::decode(bytes).map(|data| 
+                <#ident as ::prost::Message>::decode(bytes).map(|data|
                     Self(::std::sync::Arc::new(data))
                 ).map_err(|e| {
                     ::pyo3::exceptions::PyRuntimeError::new_err(format!("{}", e))
@@ -90,55 +90,74 @@ pub fn derive_object_owned(ident: &Ident, fields: &[Field]) -> proc_macro2::Toke
             }
         }
 
-        
-            
-        
+
+
+
     };
     let getters = fields.iter().map(|field| {
-        match &field.type_kind {
-            FieldType::Unknown => quote::quote!{},
-            FieldType::String => quote::quote!{},
-            FieldType::I64 => quote::quote!{},
-            FieldType::Message => {
-                // #[prost(message, optional, tag = "4")]
-                // pub author: ::core::option::Option<User>,
-                let message_ident = field.message_ident.as_ref().unwrap();
-                let borrowed_ident = format_ident!("{}Borrowed", message_ident);
-                let field_ident = &field.ident;
+        let field_ident = &field.ident;
 
-                match field.cardinality {
-                    Cardinality::Unknown | Cardinality::Required => {
+        match &field.type_kind {
+            FieldType::Map => {
+                quote::quote!{}
+            }
+            FieldType::Scalar => {
+                let field_ty = &field.ty;
+
+                match &field.cardinality {
+                    Cardinality::Unknown => unreachable!(),
+                    Cardinality::Optional | Cardinality::Required => {
                         quote::quote! {
                             #[getter]
-                            pub fn #field_ident(&self, py: Python<'py>) -> #borrowed_ident {
+                            pub fn #field_ident(&self) -> #field_ty {
+                                self.0.#field_ident.clone()
+                            }
+                        }
+                    }
+                    Cardinality::Repeated => {
+                        quote::quote! {
+                            #[getter]
+                            pub fn #field_ident(&self) -> #field_ty {
+                                self.0.#field_ident.clone()
+                            }
+                        }
+                    }
+                }
+            }
+            FieldType::Message => {
+                let message_ident = field.message_ident.as_ref().unwrap();
+                let borrowed_ident = format_ident!("{}Borrowed", message_ident);
+
+                match field.cardinality {
+                    Cardinality::Unknown => unreachable!(),
+                    Cardinality::Required => {
+                        quote::quote! {
+                            #[getter]
+                            pub fn #field_ident(&self) -> #borrowed_ident {
                                 let arc: ::std::sync::Arc<#ident> = self.0.clone();
                                 let borrowed = unsafe { std::mem::transmute::<&'_ #message_ident, &'static #message_ident>( &arc.#field_ident ) };
-                                ::pyo3::IntoPy::into_py(
-                                    #borrowed_ident {
-                                        owner: arc as ::std::sync::Arc<dyn ::std::any::Any + Send + Sync>,
-                                        borrowed,
-                                    },
-                                    py
-                                )
-                                
+
+                                #borrowed_ident {
+                                    owner: arc as ::std::sync::Arc<dyn ::std::any::Any + Send + Sync>,
+                                    borrowed,
+                                }
+
                             }
                         }
                     },
                     Cardinality::Optional => {
                         quote::quote! {
                             #[getter]
-                            pub fn #field_ident(&self, py: ::pyo3::Python) -> ::pyo3::PyObject {
-                                if self.0.#field_ident.is_none() { return py.None(); }
+                            pub fn #field_ident(&self, py: ::pyo3::Python) -> ::core::option::Option<#borrowed_ident> {
+                                if self.0.#field_ident.is_none() { return None; }
                                 let arc: ::std::sync::Arc<#ident> = self.0.clone();
                                 let borrowed = unsafe { std::mem::transmute::<&'_ #message_ident, &'static #message_ident>( arc.#field_ident.as_ref().unwrap() ) };
+
                                 
-                                ::pyo3::IntoPy::into_py(
-                                    #borrowed_ident {
-                                        owner: arc as ::std::sync::Arc<dyn ::std::any::Any + Send + Sync>,
-                                        borrowed,
-                                    },
-                                    py
-                                )
+                                Some(#borrowed_ident {
+                                    owner: arc as ::std::sync::Arc<dyn ::std::any::Any + Send + Sync>,
+                                    borrowed,
+                                })
                             }
                         }
                     },
@@ -148,8 +167,6 @@ pub fn derive_object_owned(ident: &Ident, fields: &[Field]) -> proc_macro2::Toke
                         }
                     }
                 }
-
-                
             }
         }
     });

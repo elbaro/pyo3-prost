@@ -1,10 +1,9 @@
 use prost_types::field::Cardinality;
 
 pub enum FieldType {
-    Unknown,
-    String,
-    I64,
+    Scalar,
     Message,
+    Map,
 }
 
 pub struct Field {
@@ -61,7 +60,7 @@ pub fn parse_fields(fields_: &syn::Fields) -> Vec<Field> {
                         ident: field.ident.clone().unwrap(),
                         ty: field.ty.clone(),
                         cardinality: Cardinality::Unknown,
-                        type_kind: FieldType::Unknown,
+                        type_kind: FieldType::Scalar,
                         message_ident: None,
                     };
                     let _ = attr.parse_nested_meta(|meta| {
@@ -72,9 +71,9 @@ pub fn parse_fields(fields_: &syn::Fields) -> Vec<Field> {
                         } else if meta.path.is_ident("required") {
                             field.cardinality = Cardinality::Required;
                         } else if meta.path.is_ident("string") {
-                            field.type_kind = FieldType::String;
+                            field.type_kind = FieldType::Scalar;
                         } else if meta.path.is_ident("int64") {
-                            field.type_kind = FieldType::I64;
+                            field.type_kind = FieldType::Scalar;
                         } else if meta.path.is_ident("message") {
                             field.type_kind = FieldType::Message;
                         } else if meta.path.is_ident("tag") {
@@ -85,12 +84,21 @@ pub fn parse_fields(fields_: &syn::Fields) -> Vec<Field> {
                         Ok(())
                     });
 
+                    if let Cardinality::Unknown = field.cardinality {
+                        field.cardinality = if let FieldType::Scalar = field.type_kind {
+                            Cardinality::Required
+                        } else {
+                            Cardinality::Optional
+                        };
+                    }
+
                     if let FieldType::Message = field.type_kind {
                         let msg_ty = match field.cardinality {
-                            Cardinality::Unknown | Cardinality::Optional => {
-                                extract_inner_type(&field.ty).unwrap()
+                            Cardinality::Optional => {
+                                let Some(ty) = extract_inner_type(&field.ty) else { panic!("optional+message has no inner type: {:?}", field.ty) };
+                                ty
                             }
-                            Cardinality::Required => field.ty.clone(),
+                            Cardinality::Required | Cardinality::Unknown => field.ty.clone(),
                             Cardinality::Repeated => extract_inner_type(&field.ty).unwrap(),
                         };
                         field.message_ident = extract_ident_from_ty(&msg_ty);
