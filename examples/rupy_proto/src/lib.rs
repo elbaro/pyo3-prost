@@ -6,7 +6,7 @@ use pyo3::prelude::*;
 
 #[pymodule]
 fn rupy_proto(_py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_class::<app::User>()?;
-    m.add_class::<app::Tweet>()?;
+    m.add_class::<app::UserOwned>()?;
+    m.add_class::<app::TweetOwned>()?;
     Ok(())
 }

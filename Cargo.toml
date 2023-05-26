@@ -1,7 +1,7 @@
 [package]
 name = "pyo3-prost"
 version = "0.2.0"
-edition = "2018"
+edition = "2021"
 authors = ["elbaro <elbaro@users.noreply.github.com>"]
 license = "MIT"
 repository = "https://github.com/elbaro/pyo3-prost"
@@ -9,9 +9,11 @@ description = "Use Rust protobuf structs in Python."
 keywords = ["pyo3", "prost", "protobuf"]
 
 [dependencies]
+casey = "0.4.0"
 proc-macro2 = "1.0.27"
+prost-types = "0.11.9"
 quote = "1.0.9"
-syn = {version="1.0.73", features=["full"]}
+syn = { version = "2.0.15", features = ["full", "extra-traits"] }
 
 [lib]
 proc-macro = true

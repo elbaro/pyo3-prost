@@ -55,10 +55,20 @@ The derive macro `pyclass_for_prost_struct` will add
 3. Move `examples/rupy_proto/target/release/librupy_proto.so` to `examples/rupy_proto/rupy_proto.so`.
 4. Run the bench `cd examples/rupy_proto && PYTHONPATH=. python bench.py`.
 
-## Limitations (for now)
-Accessing numeric fields is fast. However each access to a repeated, map, or message field may return a cloned Python object.
-For example `obj.list_field.clear()` will only clear the returned copy, leaving the actual value untouched.
+## Limitations
 
-Getters/setters are not provided for `oneof` fields.
+Accessing non-primitive fields can copy.
+Proxy types are being implemented to avoid copy.
 
-Later I will add a custom getter/setter for these cases.
+- [ ] List<primitive>
+- [ ] List<object>
+- [ ] Map<primitive,primitive>
+- [ ] Map<primitive, object>
+- [ ] Map<object, primitive>
+- [ ] Map<object, object>
+- [x] object, optional<object>
+- [ ] oneof (enum)
+
+## Map<primitive, primitive>
+
+## List<primitive>

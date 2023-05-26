@@ -1,3 +1,6 @@
+mod object;
+mod parse;
+
 use quote::ToTokens;
 
 extern crate proc_macro;
@@ -13,102 +16,128 @@ pub fn pyclass_for_prost_struct(
 }
 
 fn pyclass_for_prost_struct_impl(input: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
-    if let Ok(mut struct_) = syn::parse2::<syn::ItemStruct>(input.clone()) {
-        struct_
-            .attrs
-            .push(syn::parse_quote! {#[::pyo3::prelude::pyclass]});
-        if let syn::Fields::Named(fields_named) = &mut struct_.fields {
-            for field in fields_named.named.iter_mut() {
-                // exception: we do not support `oneof` fields yet
-                let is_oneof = field.attrs.iter().any(|attr| {
-                    if attr.path.is_ident("prost") {
-                        if let Ok(syn::Meta::List(list)) = attr.parse_meta() {
-                            return list.nested.iter().any(|nested_meta| {
-                                if let syn::NestedMeta::Meta(meta) = nested_meta {
-                                    if let syn::Meta::NameValue(nv) = meta {
-                                        if nv.path.is_ident("oneof") {
-                                            return true;
-                                        }
-                                    }
-                                }
-                                false
-                            });
-                        }
-                    }
-                    false
-                });
+    let Ok(struct_) = syn::parse2::<syn::ItemStruct>(input.clone()) else {
+        return input;
+    };
 
-                if !is_oneof {
-                    field.attrs.push(syn::parse_quote! {
-                        #[pyo3(get, set)]
-                    });
-                }
-            }
-        }
+    // struct_
+    //     .attrs
+    //     .push(syn::parse_quote! {#[::pyo3::prelude::pyclass]});
 
-        let struct_name = &struct_.ident;
-        let impl_ = quote::quote! {
-            #[::pyo3::prelude::pymethods]
-            impl #struct_name {
-                #[new]
-                pub fn new() -> Self {
-                    Self::default()
-                }
+    let fields = parse::parse_fields(&struct_.fields);
+    let proxy_types = object::derive_object(&struct_.ident, &fields);
 
-                #[staticmethod]
-                #[pyo3(name = "decode")]  // avoid the name conflict with prost::Message
-                pub fn decode_py(bytes: &::pyo3::types::PyBytes) -> ::pyo3::PyResult<Self> {
-                    let bytes: &[u8] = ::pyo3::FromPyObject::extract(bytes)?;
-                    <Self as ::prost::Message>::decode(bytes).map_err(|e| {
-                        ::pyo3::exceptions::PyRuntimeError::new_err(format!("{}", e))
-                    })
-                }
+    // optional -> Option<T>
+    // repeated -> Vec<T>
 
-                pub fn decode_merge(slf: &::pyo3::pycell::PyCell<#struct_name>, py: ::pyo3::Python, bytes: &::pyo3::types::PyBytes) -> ::pyo3::PyResult<()> {
-                    let bytes: &[u8] = ::pyo3::FromPyObject::extract(bytes)?;
-                    {
-                        let mut obj_mut = slf.borrow_mut();
-                        <Self as ::prost::Message>::merge(::core::ops::DerefMut::deref_mut(&mut obj_mut), bytes).map_err(|e| {
-                            ::pyo3::exceptions::PyRuntimeError::new_err(format!("{}", e))
-                        })?;
-                    }
-                    Ok(())
-                }
+    // match (field.cardinality, type_kind) {
+    //     (_, FieldType::Message) => {
+    //         // MyType => MyTypeField
+    //         // Vec<MyType> => Vec<MyTypeField>
+    //         // Option<MyType> => Option<MyTypeField>
 
-                #[pyo3(name = "encode")]
-                pub fn encode_py<'a>(&self, py: ::pyo3::Python<'a>) -> ::pyo3::PyResult<&'a ::pyo3::types::PyBytes> {
-                    Ok(::pyo3::types::PyBytes::new_with(py, ::prost::Message::encoded_len(self), |mut py_buf: &mut [u8]| {
-                        ::prost::Message::encode(self, &mut py_buf).map_err(|e| {
-                            ::pyo3::exceptions::PyRuntimeError::new_err(format!("{}", e))
-                        })?;
-                        Ok(())
-                    })?)
-                }
+    //         match field.cardinality {
+    //             Cardinality::Unknown | Cardinality::Optional => {
+    //                 let inner_type = extract_inner_type(&ty);
+    //                 let proxy_type = syn::Ident::new(
+    //                     &format!("{}Field", inner_type.to_token_stream()),
+    //                     ident.span(),
+    //                 );
 
-                pub fn clear(&mut self) {
-                    *self = Default::default();
-                }
-            }
+    //                 quote::quote! {
+    //                     #[getter]
+    //                     pub fn #ident(&self) -> Option<#proxy_type> {
+    //                         self.0.as_ref().map(|field| {
+    //                             #proxy_type {
+    //                                 owner: owner.clone(),
+    //                                 field: field,
+    //                             }
+    //                         })
 
-            #[::pyo3::prelude::pyproto]
-            impl ::pyo3::class::basic::PyObjectProtocol for #struct_name {
-                fn __repr__(&self) -> ::pyo3::PyResult<String> {
-                    Ok(format!("{:?}", self))
-                }
-                fn __str__(&self) -> ::pyo3::PyResult<String> {
-                    Ok(format!("{:#?}", self))
-                }
-            }
-        };
+    //                     }
+    //                 }
+    //             }
+    //             Cardinality::Required => {
+    //                 let proxy_type = syn::Ident::new(
+    //                     &format!("{}Field", ty.to_token_stream()),
+    //                     ident.span(),
+    //                 );
 
-        struct_
-            .into_token_stream()
-            .into_iter()
-            .chain(impl_.into_iter())
-            .collect()
-    } else {
-        input
-    }
+    //                 quote::quote! {
+    //                     #[getter]
+    //                     pub fn #ident(&self) -> &#proxy_type {
+    //                         &self.0.#ident
+    //                     }
+    //                 }
+    //             }
+    //             Cardinality::Repeated => {
+    //                 let inner_type = extract_inner_type(&ty);
+    //                 let proxy_type = syn::Ident::new(
+    //                     &format!("{}Field", inner_type.to_token_stream()),
+    //                     ident.span(),
+    //                 );
+
+    //                 quote::quote! {
+    //                     #[getter]
+    //                     pub fn #ident(&self) -> Vec<#proxy_type> {
+    //                         #proxy_type {
+    //                             owner: self.0.clone(),
+    //                             field: &self.0.#ident,
+    //                         }
+    //                     }
+    //                 }
+    //             }
+    //         }
+
+    //         // panic!();
+    //     }
+    //     (_, FieldType::String) => {
+    //         quote::quote!("unknown cardinality")
+    //     }
+    //     (Cardinality::Optional, _) => {
+    //         quote::quote!("unknown cardinality")
+    //     }
+    //     (Cardinality::Repeated, _) => {
+    //         // Vec<i8>
+    //         quote::quote! {
+    //             #[getter]
+    //             pub fn #ident(&self) -> #ty {
+    //                 &self.0.#ident
+    //             }
+    //         }
+    //     }
+    //     (Cardinality::Required, _) => {
+    //         quote::quote! {
+    //             #[getter]
+    //             pub fn #ident(&self) -> #ty {
+    //                 &self.0.#ident
+    //             }
+    //         }
+    //     }
+    //     (Cardinality::Unknown, _) => {
+    //         quote::quote!("unknown cardinality")
+    //     }
+    // }
+
+    // let field_struct = quote::quote! {
+    //     struct asdf {
+    //         owner: Arc<#struct_name>,
+    //         field: &#struct_name,
+    //     }
+    //     #[pymethods]
+    //     impl asdf {
+    //         #(
+    //             #field_tokens
+    //         )*
+    //     }
+    // };
+
+    struct_
+        .into_token_stream()
+        .into_iter()
+        .chain(proxy_types.into_iter())
+        // .chain(field_struct.into_iter())
+        .collect()
 }
 
 #[cfg(test)]
@@ -123,3 +152,5 @@ mod tests {
         println!("{}", super::pyclass_for_prost_struct_impl(ts));
     }
 }
+
+// struct RustAttribute<Root, Field>(OwningRef<Arc<Root>, Field>);

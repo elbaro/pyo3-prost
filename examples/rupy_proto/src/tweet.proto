@@ -3,13 +3,14 @@ syntax = "proto3";
 package App;
 
 message User {
-    string name = 1;
-    string profile_url = 2;
+  string name = 1;
+  string profile_url = 2;
+  repeated int64 follower_ids = 3;
 }
 
 message Tweet {
+  User author = 4;
   string text = 1;
   int64 created_timestamp = 2;
-  User author = 4;
   repeated string mentions = 5;
 }
