@@ -39,19 +39,3 @@ print('===========')
 print('  RustTweet')
 print('===========')
 print(r)
-
-
-p = PythonTweet()
-print(
-    'Python: ',
-    timeit.timeit(
-        lambda: (p.Clear()),
-        number=int(1e6),
-    ),
-)
-
-r = RustTweet()
-print(
-    'Rust  : ',
-    timeit.timeit(lambda: (r.clear()), number=int(1e6)),
-)
