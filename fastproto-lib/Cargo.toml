@@ -1,0 +1,13 @@
+[package]
+name = "fastproto-lib"
+version = "0.2.0"
+edition = "2021"
+authors = ["elbaro <elbaro@users.noreply.github.com>"]
+license = "MIT"
+repository = "https://github.com/elbaro/pyo3-prost"
+description = "Use Rust protobuf structs in Python."
+keywords = ["pyo3", "prost", "protobuf"]
+
+[dependencies]
+prost-types = "0.11.9"
+pyo3 = { version = "0.18.3", features = ["multiple-pymethods"] }
