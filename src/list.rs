@@ -30,6 +30,19 @@ pub trait ProxyListTrait {
 // impl ProxyListTrait for [i64] {}
 // impl ProxyListTrait for [i32] {}
 
+// Vec<Mention>
+// MentionList { owner, slice: &[Mention] }
+// MentionList::get(5) =
+//      MentionBorrowed { owner,  borrowed: &mentions[idx] }
+
+// impl New<T> for MentionBorrowed {
+//    fn new(owner: Arc<dyn Any + Send + Sync>, borrowed: &'static Mention) -> Self {
+//        Self {
+//            owner,
+//            borrowed,
+//    }
+// }
+
 // impl ProxyListTrait for BorrowedList<Item, Borrowed> {
 //     fn len(&self) -> usize {
 //         self.slice.len()

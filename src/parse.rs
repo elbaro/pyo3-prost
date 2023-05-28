@@ -3,7 +3,7 @@ use prost_types::field::Cardinality;
 pub enum FieldType {
     Scalar,
     Message,
-    Map,
+    _Map,
 }
 
 pub struct Field {
