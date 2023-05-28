@@ -4,4 +4,5 @@ members = [
     "fastproto-macro",
     "fastproto-cli",
     "examples/rupy_proto",
+    "examples/proto-gen",
 ]

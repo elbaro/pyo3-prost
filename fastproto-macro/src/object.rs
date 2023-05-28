@@ -48,15 +48,14 @@ pub fn derive_object(ident: &Ident, fields: &[Field]) -> proc_macro2::TokenStrea
             }
 
             pub fn decode_merge(&mut self, py: ::pyo3::Python, bytes: &::pyo3::types::PyBytes) -> ::pyo3::PyResult<()> {
-                // let bytes: &[u8] = ::pyo3::FromPyObject::extract(bytes)?;
-                // {
-                //     let mut obj_mut = ::std::sync::Arc::get_mut(&mut self.0).ok_or_else(|| ::pyo3::exceptions::PyRuntimeError::new_err("You cannot mutate the object while borrowing."))?;
-                //     <#ident as ::prost::Message>::merge(::core::ops::DerefMut::deref_mut(&mut obj_mut), bytes).map_err(|e| {
-                //         ::pyo3::exceptions::PyRuntimeError::new_err(format!("{}", e))
-                //     })?;
-                // }
-                Err(::pyo3::exceptions::PyRuntimeError::new_err("todo"))
-                // Ok(())
+                let bytes: &[u8] = ::pyo3::FromPyObject::extract(bytes)?;
+                let borrowed = unsafe { ::std::mem::transmute::<& #ident, &mut #ident>(self.borrowed) };
+                {
+                    <#ident as ::prost::Message>::merge(borrowed, bytes).map_err(|e| {
+                        ::pyo3::exceptions::PyRuntimeError::new_err(format!("{}", e))
+                    })?;
+                }
+                Ok(())
             }
 
             pub fn encode<'a>(&self, py: ::pyo3::Python<'a>) -> ::pyo3::PyResult<&'a ::pyo3::types::PyBytes> {
@@ -68,11 +67,9 @@ pub fn derive_object(ident: &Ident, fields: &[Field]) -> proc_macro2::TokenStrea
                 })?)
             }
 
-            pub fn clear(&mut self) -> ::pyo3::PyResult<()> {
-                // let mut r = ::std::sync::Arc::get_mut(&mut self.0).ok_or_else(|| ::pyo3::exceptions::PyRuntimeError::new_err("You cannot mutate the object while borrowing."))?;
-                // *r = Default::default();
-                Err(::pyo3::exceptions::PyRuntimeError::new_err("todo"))
-                // Ok(())
+            pub fn clear(&mut self) {
+                let borrowed = unsafe { ::std::mem::transmute::<& #ident, &mut #ident>(self.borrowed) };
+                *borrowed = Default::default();
             }
 
             fn __repr__(&self) -> String {
@@ -153,10 +150,10 @@ pub fn derive_object(ident: &Ident, fields: &[Field]) -> proc_macro2::TokenStrea
                         // TODO: use proxy list
                         quote::quote! {
                             #[getter]
-                            pub fn #field_ident(&self) -> ProxyList {
+                            pub fn #field_ident(&self) -> ::fastproto_lib::list::ProxyList {
                                 let borrowed = unsafe { std::mem::transmute::<&'_[#message_ident], &'static[#message_ident]>( self.borrowed.#field_ident.as_slice() ) };
 
-                                ProxyList(Box::new(BorrowedList {
+                                ::fastproto_lib::list::ProxyList(Box::new(::fastproto_lib::list::BorrowedList {
                                     owner: self.owner.clone(),
                                     slice: borrowed,
                                 }))
