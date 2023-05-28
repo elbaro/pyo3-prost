@@ -1,4 +1,4 @@
-#[::pyo3_prost::pyclass_for_prost_struct]
+#[::fastproto_macro::pyclass_for_prost_struct]
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct User {
@@ -9,7 +9,7 @@ pub struct User {
     #[prost(int64, repeated, tag = "3")]
     pub follower_ids: ::prost::alloc::vec::Vec<i64>,
 }
-#[::pyo3_prost::pyclass_for_prost_struct]
+#[::fastproto_macro::pyclass_for_prost_struct]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Tweet {
     #[prost(message, tag = "10")]

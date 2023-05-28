@@ -1,0 +1,18 @@
+[package]
+name = "fastproto-macro"
+version = "0.1.0"
+edition = "2021"
+authors = ["elbaro <elbaro@users.noreply.github.com>"]
+license = "MIT"
+repository = "https://github.com/elbaro/pyo3-prost"
+description = "proc-macros for fastproto"
+keywords = ["pyo3", "prost", "protobuf"]
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[dependencies]
+proc-macro2 = "1.0.27"
+prost-types = "0.11.9"
+quote = "1.0.9"
+syn = { version = "2.0.15", features = ["full", "extra-traits"] }
+
+[lib]
+proc-macro = true

@@ -37,12 +37,11 @@ pub fn derive_object(ident: &Ident, fields: &[Field]) -> proc_macro2::TokenStrea
             }
 
             #[staticmethod]
-            #[pyo3(name = "decode")]  // avoid the name conflict with prost::Message
-            pub fn decode_py(bytes: &::pyo3::types::PyBytes) -> ::pyo3::PyResult<Self> {
+            pub fn decode(bytes: &::pyo3::types::PyBytes) -> ::pyo3::PyResult<Self> {
                 let bytes: &[u8] = ::pyo3::FromPyObject::extract(bytes)?;
                 <#ident as ::prost::Message>::decode(bytes).map(|data| {
                     let owner = ::std::sync::Arc::new(data);
-                    Self::new_owned(owner)
+                    <Self as ::fastproto_lib::Ref<_>>::new_owned(owner)
                 }).map_err(|e| {
                     ::pyo3::exceptions::PyRuntimeError::new_err(format!("{}", e))
                 })
@@ -60,8 +59,7 @@ pub fn derive_object(ident: &Ident, fields: &[Field]) -> proc_macro2::TokenStrea
                 // Ok(())
             }
 
-            #[pyo3(name = "encode")]
-            pub fn encode_py<'a>(&self, py: ::pyo3::Python<'a>) -> ::pyo3::PyResult<&'a ::pyo3::types::PyBytes> {
+            pub fn encode<'a>(&self, py: ::pyo3::Python<'a>) -> ::pyo3::PyResult<&'a ::pyo3::types::PyBytes> {
                 Ok(::pyo3::types::PyBytes::new_with(py, ::prost::Message::encoded_len(self.borrowed), |mut py_buf: &mut [u8]| {
                     ::prost::Message::encode(self.borrowed, &mut py_buf).map_err(|e| {
                         ::pyo3::exceptions::PyRuntimeError::new_err(format!("{}", e))
@@ -110,6 +108,7 @@ pub fn derive_object(ident: &Ident, fields: &[Field]) -> proc_macro2::TokenStrea
                         quote::quote! {
                             #[getter]
                             pub fn #field_ident(&self) -> #field_ty {
+                                // TODO: use proxy list
                                 self.borrowed.#field_ident.clone()
                             }
                         }
@@ -139,7 +138,7 @@ pub fn derive_object(ident: &Ident, fields: &[Field]) -> proc_macro2::TokenStrea
                     Cardinality::Optional => {
                         quote::quote! {
                             #[getter]
-                            pub fn #field_ident(&self, py: ::pyo3::Python) -> ::core::option::Option<#ref_ident> {
+                            pub fn #field_ident(&self) -> ::core::option::Option<#ref_ident> {
                                 if self.borrowed.#field_ident.is_none() { return None; }
                                 let borrowed = unsafe { std::mem::transmute::<&'_ #message_ident, &'static #message_ident>( self.borrowed.#field_ident.as_ref().unwrap() ) };
 
@@ -151,8 +150,17 @@ pub fn derive_object(ident: &Ident, fields: &[Field]) -> proc_macro2::TokenStrea
                         }
                     },
                     Cardinality::Repeated => {
+                        // TODO: use proxy list
                         quote::quote! {
+                            #[getter]
+                            pub fn #field_ident(&self) -> ProxyList {
+                                let borrowed = unsafe { std::mem::transmute::<&'_[#message_ident], &'static[#message_ident]>( self.borrowed.#field_ident.as_slice() ) };
 
+                                ProxyList(Box::new(BorrowedList {
+                                    owner: self.owner.clone(),
+                                    slice: borrowed,
+                                }))
+                            }
                         }
                     }
                 }
@@ -171,22 +179,31 @@ pub fn derive_object(ident: &Ident, fields: &[Field]) -> proc_macro2::TokenStrea
 
         impl Default for #ref_ident {
             fn default() -> Self {
-                Self::new_owned(Default::default())
+                <Self as ::fastproto_lib::Ref<#ident>>::new_owned(::std::sync::Arc::<#ident>::default())
             }
         }
 
-        impl #ref_ident {
-            pub fn new(owner: ::std::sync::Arc<#ident>, borrowed: &'static #ident) -> Self {
+        impl ::fastproto_lib::AsBorrowed for #ident {
+            type Borrowed = #ref_ident;
+
+            fn as_borrowed(&self, owner: ::std::sync::Arc<dyn Send + Sync>) -> Self::Borrowed {
+                let borrowed = unsafe { std::mem::transmute::<&'_ #ident, &'static #ident>(self) };
+                <Self::Borrowed as ::fastproto_lib::Ref<#ident>>::new(owner, borrowed)
+            }
+        }
+
+        impl ::fastproto_lib::Ref<#ident> for #ref_ident {
+            fn new(owner: ::std::sync::Arc<dyn Send + Sync>, borrowed: &'static #ident) -> Self {
                 Self {
                     owner,
                     borrowed,
                 }
             }
 
-            pub fn new_owned(owner: ::std::sync::Arc<#ident>) -> Self {
+            fn new_owned(owner: ::std::sync::Arc<#ident>) -> Self {
                 let borrowed = unsafe { std::mem::transmute::<&'_ #ident, &'static #ident>(owner.as_ref()) };
                 Self {
-                    owner: owner as ::std::sync::Arc<dyn Send + Sync>,
+                    owner,
                     borrowed,
                 }
             }

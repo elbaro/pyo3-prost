@@ -18,4 +18,5 @@ owning_ref = "0.4.1"
 prost = "0.11.9"
 prost-build = "0.11.9"
 pyo3 = { version = "0.18.3", features = ["multiple-pymethods"] }
-pyo3-prost = { path = "../.." }
+fastproto-macro = { path = "../../fastproto-macro" }
+fastproto-lib = { path = "../../fastproto-lib" }
