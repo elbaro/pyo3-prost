@@ -7,6 +7,7 @@ Python code accessing a field `[123, 456, 789]` will get a reference to Vec<i64>
 
 [Docs](https://docs.rs/pyo3-prost/0.1.0/pyo3_prost/)
 
+**The official Python grpc library now internally uses the C library. This library is obsolete.**
 
 ```sh
 # decoding (secs)
